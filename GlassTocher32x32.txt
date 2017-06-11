@@ -21,7 +21,7 @@ Actor GlassTocher32x32 303
   }
 }
 
-//GLASSSS DEBRISSSSSSSSSSSSSSS
+//DEBRIS
 ACTOR GlassDebris1
 {
 	Height 8
