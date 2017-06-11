@@ -1,0 +1,485 @@
+#include "zcommon.acs"
+
+
+
+//**********************************
+//Variables
+//**********************************
+global int 1:time_y;
+global int 2:time_m;
+global int 3:time_d;
+global int 4:time_hh;
+global int 5:time_mm;
+global int 6:time_ss;
+
+
+
+//**********************************
+//Scripts
+//**********************************
+Script "WORLD" OPEN
+{
+	while(TRUE)
+	{
+		time_tic(0.0285645);
+		delay(1);
+	}
+}
+
+int mouseshow[8];
+Script "PLAYER" ENTER
+{
+	int pn=PlayerNumber();
+	Thing_ChangeTID(0,600+pn);//not here!
+	//LETS BEGIN!
+	int tail;
+	int ptid=UniqueTID;
+	int X=320.0;
+	int Y=240.0;
+	int S=1.0;
+	int Integer;
+	int LevelToInteger=1.0;
+	int PointToInteger=0;
+	bool cur_c; //clicked
+	bool cur_drag; //cursor is dragging
+	bool cur_r[5]; //which button ready for operation
+	//1 - Regulator
+	//2 - add point
+	//3 - subtract point
+	//4 - add assign point
+	//5 - subtract assign point
+	int buttonX1[5]={600.0, 600.0, 580.0, 600.0, 580.0}; //coordinations of buttons
+	int buttonX2[5]={620.0, 620.0, 600.0, 620.0, 600.0};
+	int buttonY1[5]={70.0, 200.0, 200.0, 240.0, 240.0};
+	int buttonY2[5]={90.0, 220.0, 220.0, 260.0, 260.0};
+	//1 can change Y position, dragging by Y
+	str cursorSprite[2]={"CURSOR", "CURSOR1"};
+	str ButtonSprite[5]={"BUTTON1", "BUTTON2", "BUTTON3", "BUTTON4", "BUTTON5"};
+	int cursorSpriteNumber;
+	while(TRUE)
+	{
+		Integer=666.0;
+		if(mouseshow[pn]==TRUE)
+		{
+			SetPlayerProperty(pn,1,PROP_TOTALLYFROZEN);
+			int oldangle=GetActorAngle(0);
+			int oldpitch=GetActorPitch(0);
+			while (mouseshow[pn]==TRUE)
+			{
+				//move
+				SetActorAngle(0,oldangle);
+				SetActorPitch(0,oldpitch);
+				x+=GetPlayerInput(pn,INPUT_YAW)*1.0/60/-1;tail=x%1.0;x-=tail;
+				y+=(FixedMul(GetPlayerInput(pn,INPUT_PITCH)<<16,1.7)>>16)*1.0/60/-1;tail=y%1.0;y-=tail;
+				if(x<0)x=0;
+				if(x>640.0)x=640.0;
+				if(y<0)y=0;
+				if(y>480.0)y=480.0;
+				//3D Cursor
+				int XYZ_Pitch=oldpitch-FixedDiv(0.125,1.2)+FixedDiv(FixedDiv(y,480.0)/4,1.2); //1.2 for fix
+				int XYZ_Angle=(oldangle+FixedMul(0.125,1.1))+FixedMul(FixedDiv(x,640.0)/4,1.1)/-1;
+				LineAttack(0,XYZ_Angle,XYZ_Pitch,5,0,0,4096.0,FHF_NORANDOMPUFFZ|FHF_NOIMPACTDECAL,ptid);
+				//check button
+				for (int i = 0; i < 5; i++)
+				{
+					if ((X>=ButtonX1[i]&&X<=ButtonX2[i]) && (Y>=ButtonY1[i]&&Y<=ButtonY2[i]))
+					{
+						cursorSpriteNumber=1;
+						cur_r[i]=TRUE;
+						break;
+					}
+					cursorSpriteNumber=0;
+					cur_r[i]=FALSE;
+				}
+				if(cur_drag==TRUE)cur_r[0]=TRUE;
+				//Click
+				if((getplayerinput(pn, INPUT_BUTTONS) & BT_ATTACK)) //Hold
+				{
+					if (cur_c==FALSE)//stop cycle
+					{
+						//click!
+						for (i = 0; i < 5; i++) //check all buttons
+						{
+							if(cur_r[i]==TRUE) //if this button ready to activate
+							{
+								if(i==0) //hit regulator! //TYPE: HOLDING
+								{
+									cur_drag=TRUE; //start dragging by holding button
+									ButtonY1[i]+=(FixedMul(GetPlayerInput(pn,INPUT_PITCH)<<16,1.7)>>16)*1.0/60/-1;tail=ButtonY1[i]%1.0;ButtonY1[i]-=tail;
+									ButtonY2[i]+=(FixedMul(GetPlayerInput(pn,INPUT_PITCH)<<16,1.7)>>16)*1.0/60/-1;tail=ButtonY1[i]%1.0;ButtonY1[i]-=tail;
+									levelToInteger=FixedMul(1.0,FixedDiv((145.0-ButtonY1[i]),75.0));
+									if(ButtonY1[i]<=70.0||ButtonY2[i]<=90.0)
+									{
+										ButtonY1[i]=70.0;
+										ButtonY2[i]=90.0;
+									}
+									if(ButtonY1[i]>=145.0||ButtonY2[i]>=165.0)
+									{
+										ButtonY1[i]=145.0;
+										ButtonY2[i]=165.0;
+									}
+								}
+								if(i==1) //TYPE: ONCE PER CLICK
+								{
+									Integer+=PointToInteger;
+								}
+								if(i==2) //TYPE: ONCE PER CLICK
+								{
+									Integer-=PointToInteger;
+								}
+								if(i==3) //TYPE: ONCE PER CLICK
+								{
+									PointToInteger+=1.0;
+								}
+								if(i==4) //TYPE: ONCE PER CLICK
+								{
+									PointToInteger-=1.0;
+									if(PointToInteger<0)PointToInteger=0;
+								}
+								break;
+							}
+						}
+						if(cur_drag!=TRUE)cur_c=TRUE;//stop cycle.
+					}
+					//Do Nothing
+				}
+				else //release
+				{
+					cur_drag=FALSE; //stop dragging by release button
+					cur_c=FALSE;//stop cycle
+				}
+				if((getplayerinput(pn, INPUT_BUTTONS) & BT_USE))
+				{
+					mouseshow[pn]=FALSE;
+				}
+				//display
+				SetHudSize(640,480,1);
+				SetFont(cursorSprite[cursorSpriteNumber]);
+				HudMessage(s:"a";HUDMSG_PLAIN,100,0,X,Y,0.1);
+				for (i = 0; i < 5; i++) //buttons
+				{
+					SetFont(ButtonSprite[i]);
+					HudMessage(s:"a";HUDMSG_PLAIN,101+i,0,ButtonX1[i],ButtonY1[i],0.1);
+				}
+				SetFont("smallfont");
+				hudmessage(s:"Player: ",n:pn,s:"\nTID: ",d:600+pn;HUDMSG_PLAIN,120,CR_WHITE,64.0,16.0,0.1);
+				HudMessage(f:levelToInteger;HUDMSG_PLAIN,111,CR_WHITE,ButtonX1[0]-40.0,ButtonY1[0]+10.0,0.1);
+				SetFont("SmallFont");
+				HudMessage(f:FixedMul(levelToInteger,Integer);HUDMSG_PLAIN,109,CR_GOLD,580.0,48.0,0.1);
+				HudMessage(s:"Change point:\n";HUDMSG_PLAIN,106,CR_WHITE,580.0,190.0,0.1);
+				HudMessage(s:"Change assign:\n";HUDMSG_PLAIN,107,CR_WHITE,580.0,230.0,0.1);
+				SetFont("BigFont");
+				HudMessage(d:PointToInteger/65536;HUDMSG_PLAIN,108,CR_WHITE,560.0,250.0,0.1);
+				SetFont("GRAPHIC1");
+				HudMessage(s:"a";HUDMSG_PLAIN,110,0,600.0,60.0,0.1);
+				delay(1);
+			}
+			SetPlayerProperty(pn,0,PROP_TOTALLYFROZEN);
+		}
+		delay(1);//until die, disconnect, moving to other map.
+	}
+}
+
+Script 999 (void) //switch menu hud
+{
+	int pn=PlayerNumber();
+	if(mouseshow[pn]==TRUE){mouseshow[pn]=FALSE;
+	terminate;}
+	if(mouseshow[pn]==FALSE){mouseshow[pn]=TRUE;
+	terminate;}
+}
+
+
+
+//**********************************
+//functions
+//**********************************
+function void time_tic (int speed)
+{
+	if(time_d==0)time_d=1;
+	if(time_m==0)time_m=1;
+	int tail;
+	int SS[3]={25,100,171};//skyshadow
+	int SL[3]={32,20,50};//dark
+	int EL[3];//bright
+	int AL[3];//adjust
+	int AL2[3];//adjust for skyshadow
+	int level; //1.0
+	//1 tic=0.0285645 sec or 0.0285714285714286
+	//default is 1 sec per 35 tic.
+	//minimum 1 second per tic
+	//maximum 86400 second per 1 tic.
+	//86400 - 1 day by seconds.
+	//
+	//
+	//
+	//minimum
+	//speed=FixedDiv(speed,35.0);//1.0 = 0.0285645
+	time_ss+=FixedMul(1.0,speed); //175 or 240 or 3672
+	if(time_ss>=60.0)
+	{
+		tail=time_ss%60.0; //55 or 0 or 12
+		time_ss-=tail; //120 or 240 or
+		time_mm+=FixedDiv(time_ss,60.0)>>16;//2 or 4 or 61
+		time_ss=tail;
+		if(time_mm>=60) //if time_sec>=3600
+		{
+			tail=time_mm%60; // 1
+			time_mm-=tail; //60
+			time_hh+=time_mm/60; //1
+			time_mm=tail;
+			if(time_hh>=24) //if time_sec>=86400
+			{
+				time_hh=0;
+				time_d++;
+				if(time_d>31) //nope
+				{
+					time_d=1;
+					time_m++;
+					if(time_m>12) //nope
+					{
+						time_m=1;
+						time_y++;
+						//maximum
+					}
+				}
+			}
+		}
+	}
+	//light level (sun > closed room)
+	//6:00-8:00 - to orange (progress is lite violet)
+	//8:00-10:00 - to white (no color)
+	//18:00-21:00 - to fire color
+	//21:00-24:00 - to bluedark (progress is violet)
+	int nc[3],oc[3];
+	int nssc[3],ossc[3];
+	if(time_hh>=0&&time_hh<6)
+	{
+		//90,100,158 loop
+		nc[0]=90;
+		oc[0]=90;
+
+		nc[1]=100;
+		oc[1]=100;
+
+		nc[2]=158;
+		oc[2]=158;
+		nssc[0]=32;
+		ossc[0]=32;
+
+		nssc[1]=20;
+		ossc[1]=20;
+
+		nssc[2]=50;
+		ossc[2]=50;
+		level=0;
+	}
+	if(time_hh>=6&&time_hh<8)
+	{
+		level=1.0-FixedMul(1.0,FixedDiv(480.0-((time_hh*60+time_mm)<<16),120.0));
+		//to 255,108,88
+		nc[0]=255;
+		oc[0]=90;
+
+		nc[1]=108;
+		oc[1]=100;
+
+		nc[2]=88;
+		oc[2]=158;
+		nssc[0]=28;
+		ossc[0]=32;
+
+		nssc[1]=60;
+		ossc[1]=20;
+
+		nssc[2]=110;
+		ossc[2]=50;
+	}
+	if(time_hh>=8&&time_hh<10)
+	{
+		level=1.0-FixedMul(1.0,FixedDiv(600.0-((time_hh*60+time_mm)<<16),120.0));
+		//to 255,255,255
+		nc[0]=255;
+		oc[0]=255;
+
+		nc[1]=255;
+		oc[1]=108;
+
+		nc[2]=255;
+		oc[2]=88;
+		ossc[0]=28;
+		nssc[0]=25;
+
+		ossc[1]=60;
+		nssc[1]=100;
+
+		ossc[2]=110;
+		nssc[2]=171;
+	}
+	if(time_hh>=10&&time_hh<18)
+	{
+		//255,255,255 loop
+		nc[0]=255;
+		oc[0]=255;
+
+		nc[1]=255;
+		oc[1]=255;
+
+		nc[2]=255;
+		oc[2]=255;
+		nssc[0]=25;
+		ossc[0]=25;
+
+		nssc[1]=100;
+		ossc[1]=100;
+
+		nssc[2]=171;
+		ossc[2]=171;
+		level=1.0;
+	}
+	if(time_hh>=18&&time_hh<20)
+	{
+		level=1.0-FixedMul(1.0,FixedDiv(1200.0-((time_hh*60+time_mm)<<16),120.0));
+		//to 255,85,74
+		nc[0]=255;
+		oc[0]=255;
+
+		nc[1]=85;
+		oc[1]=255;
+
+		nc[2]=74;
+		oc[2]=255;
+		nssc[0]=147;//+2 147
+		ossc[0]=25;
+
+		nssc[1]=18;//-27 18
+		ossc[1]=100;
+
+		nssc[2]=124;//-40 124
+		ossc[2]=171;
+	}
+	if(time_hh>=20&&time_hh<22)
+	{
+		level=1.0-FixedMul(1.0,FixedDiv(1320.0-((time_hh*60+time_mm)<<16),120.0));
+		//to 201,42,72
+		nc[0]=201;
+		oc[0]=255;
+
+		nc[1]=42;
+		oc[1]=85;
+
+		nc[2]=72;
+		oc[2]=74;
+		ossc[0]=147;
+		nssc[0]=100; //100
+
+		ossc[1]=18;
+		nssc[1]=15; //15
+
+		ossc[2]=124;
+		nssc[2]=127; //127
+	}
+	if(time_hh>=22&&time_hh<24)
+	{
+		level=1.0-FixedMul(1.0,FixedDiv(1440.0-((time_hh*60+time_mm)<<16),120.0));
+		//to 90,100,158
+		oc[0]=201;
+		nc[0]=90;
+
+		oc[1]=42;
+		nc[1]=100;
+
+		oc[2]=72;
+		nc[2]=158;
+		nssc[0]=32;
+		ossc[0]=100;
+
+		nssc[1]=20;
+		ossc[1]=15;
+
+		nssc[2]=50;
+		ossc[2]=127;
+	}
+	for (int i3 = 0; i3 < 3; i3++)
+	{
+		EL[i3]=oc[i3]+(FixedMul(level,(nc[i3]-oc[i3]<<16))>>16);
+		SS[i3]=ossc[i3]+(FixedMul(level,(nssc[i3]-ossc[i3]<<16))>>16);
+	}
+	for (int i = 0; i < 10; i++)
+	{
+		for (int i2 = 0; i2 < 3; i2++)
+		{
+			//tail=EL[i2]-SL[i2]; //223
+			//EL[i2]-=tail;
+			AL[i2]=EL[i2]-SL[i2]<<16;
+			AL[i2]=FixedMul(AL[i2],FixedDiv((i+1<<16),10.0))>>16;
+			AL2[i2]=EL[i2]-SS[i2]<<16;
+			AL2[i2]=FixedMul(AL2[i2],FixedDiv((i+1<<16),10.0))>>16;
+		}
+		Sector_SetColor(1000+i,SL[0]+AL[0],SL[1]+AL[1],SL[2]+AL[2]);
+		Sector_SetColor(1018-i,SS[0]+AL2[0],SS[1]+AL2[1],SS[2]+AL2[2]);
+	}
+	Sector_SetColor(1000,32,20,50);
+	//info:
+	SetHudSize(800,600,1);
+	SetFont("smallfont");
+	HudMessageBold(s:"year:",d:time_y,s:"\nmonth:",d:time_m,s:"\nDay:",d:time_d,s:"\n",d:time_hh,s:":",d:time_mm,s:":",f:time_ss-(time_ss%1.0),s:"\n",f:level;
+	HUDMSG_PLAIN|HUDMSG_NOTWITHFULLMAP|HUDMSG_NOTWITHOVERLAYMAP,98,CR_RED,400.0,100.0,0.1);
+	return;
+}
+
+function int abs (int x)
+{
+    if (x < 0)
+        return -x;
+
+    return x;
+}
+function int min (int a, int b)
+{
+	if (a < b)
+		return a;
+
+	return b;
+}
+
+function int max (int a, int b)
+{
+	if (a > b)
+		return a;
+
+	return b;
+}
+
+function int fdistance (int tid1, int tid2) //x,y,z
+{
+	int len;
+	int y = getactory(tid1) - getactory(tid2);
+	int x = getactorx(tid1) - getactorx(tid2);
+	int z = getactorz(tid1) - getactorz(tid2);
+
+	int ang = vectorangle(x,y);
+	if(((ang+0.125)%0.5) > 0.25) len = fixeddiv(y, sin(ang));
+	else len = fixeddiv(x, cos(ang));
+
+
+	ang = vectorangle(len, z);
+	if(((ang+0.125)%0.5) > 0.25) len = fixeddiv(z, sin(ang));
+	else len = fixeddiv(len, cos(ang));
+
+	return len;
+}
+
+function int fdistanceXY (int tid1, int tid2) //x,y
+{
+	int len;
+	int y = getactory(tid1) - getactory(tid2);
+	int x = getactorx(tid1) - getactorx(tid2);
+	int z = getactorz(tid1) - getactorz(tid2);
+
+	int ang = vectorangle(x,y);
+	if(((ang+0.125)%0.5) > 0.25) len = fixeddiv(y, sin(ang));
+	else len = fixeddiv(x, cos(ang));
+
+	return len;
+}
